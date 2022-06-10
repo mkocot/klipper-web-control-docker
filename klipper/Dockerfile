@@ -29,6 +29,12 @@ RUN [ ! -d ${KLIPPER_VENV_DIR} ] && virtualenv -p python2 ${KLIPPER_VENV_DIR}
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install pip -U
 RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel
 RUN ${KLIPPER_VENV_DIR}/bin/pip install -r klipper/scripts/klippy-requirements.txt
+# Uncomment if you want use ADXL sensor support
+# RUN ${KLIPPER_VENV_DIR}/bin/pip install numpy
+
+# build host process
+COPY klipper/host_config klipper/.config
+RUN make -C klipper all
 
 # Install moonraker
 RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Arksine/moonraker.git moonraker
@@ -84,7 +90,11 @@ ARG DEVICE_GID=987
 
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
     groupadd -g ${DEVICE_GID} ${DEVICE_GROUP} && \
+    groupadd -g 997 gpio && \
+    groupadd -g 999 spi && \
     usermod -a -G ${DEVICE_GROUP} ${USER} && \
+    usermod -a -G gpio ${USER} && \
+    usermod -a -G spi ${USER} && \
     usermod -a -G tty ${USER} && \
     usermod -a -G dialout ${USER} && \
     mkdir -p /var/log/supervisor && \
