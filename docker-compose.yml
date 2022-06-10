@@ -11,6 +11,8 @@ services:
       #   DEVICE_GID: 987
     container_name: klipper
     privileged: true
+    cap_add:
+      - sys_nice
     ports:
       - 7125:7125
     restart: unless-stopped
@@ -19,7 +21,7 @@ services:
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/.config
-      - moonraker_data:/home/klippy/.moonraker
+      - moonraker_data:/home/klippy/.moonraker_database
       - /dev:/dev
       # - <<your_config_path>>:/home/klippy/.config
       # - ./printer.cfg:/home/klippy/.config/printer.cfg
@@ -71,9 +73,6 @@ services:
     depends_on: 
       - klipper
       # - klipper_another_printer
-    links:
-      - klipper:klipper
-      # - klipper_another_printer:klipper_another_printer
 
 #  mainsail:
 #    image: dimalo/mainsail
@@ -88,9 +87,31 @@ services:
 #    depends_on: 
 #      - klipper
 #      # - klipper_another_printer
-#    links:
-#      - klipper:klipper
-#      # - klipper_another_printer:klipper_another_printer
+
+  dwin:
+    image: dwin_t5uic1_lcd_dwin
+    #build:
+    # dockerfile: Dockerfile.asdf
+    # context: .
+    container_name: dwin
+    restart: unless-stopped
+    depends_on:
+     - klipper
+    environment:
+      - LOGLEVEL=${LOGLEVEL-INFO}
+      - DWIN_SERIAL=${DWIN_SERIAL-/dev/ttyS0}
+      - DWIN_ENCODER=${DWIN_ENCODER-25,24}
+      - DWIN_BUTTON=${DWIN_BUTTON-23}
+      - MOONRAKER_API_KEY=${MOONRAKER_API_KEY-}
+      - MOONRAKER_HOST=klipper
+      - MOONRAKER_PORT=${MOONRAKER_PORT-7125}
+    volumes:
+      - /sys:/sys
+      - /sys/devices/platform/soc/3f200000.gpio/gpiochip0:/sys/devices/platform/soc/3f200000.gpio/gpiochip0
+    devices:
+      # ensure container will have sufficient permission to read and write
+      - ${DWIN_SERIAL-/dev/ttyS0} # Serial device where screen is connected
+      - /dev/gpiomem
 
 volumes: 
   gcode_files:
