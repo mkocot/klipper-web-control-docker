@@ -1,4 +1,4 @@
-version: '3.4'
+version: '2'
 
 services:
   klipper:
@@ -6,33 +6,34 @@ services:
     build:
       dockerfile: ./klipper/Dockerfile
       context: .
-      # args:
-      #   DEVICE_GROUP: device
-      #   DEVICE_GID: 987
-    # if klipper cannot connect to the printer check permissions on rpi then add the group here
-    # group_add:
-    #   - "996"
-    #   - "998"
-    container_name: klipper
-    privileged: true
+    group_add:
+      - "996"
+      - "998"
+      - "5"
+      - "20"
     cap_add:
-      - sys_nice
+      - SYS_NICE
+      - SYS_RAWIO
+    container_name: klipper
     ports:
       - 7125:7125
     restart: unless-stopped
     volumes:
-      - moonraker_data:/home/klippy/printer_data
-      - gcode_files:/home/klippy/printer_data/gcodes
+      - gcode_files:/home/klippy/gcode_files
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
-      - ./config:/home/klippy/printer_data/config
-      - /dev:/dev
+      - ./config:/home/klippy/.config
+      - moonraker_data:/home/klippy/.moonraker_database
       # - <<your_config_path>>:/home/klippy/.config
       # - ./printer.cfg:/home/klippy/.config/printer.cfg
     # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
     # put <container_dev> into your printer.cfg
-    #devices:
-    #  - /dev/ttyUSB0:/dev/ttyUSB0
+    devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/spidev0.0:/dev/spidev0.0
+      - /dev/gpiomem:/dev/gpiomem
+      - /dev/gpiochip0:/dev/gpiochip0
+
 
   ##################################################################
   # Example config for a second printer on a different serial port
@@ -66,56 +67,36 @@ services:
 
 
   fluidd:
-    image: cadriel/fluidd
+    image: dimalo/fluidd
     # build:
     #   dockerfile: Dockerfile
     #   context: frontend
-    restart: unless-stopped
     container_name: fluidd
     ports:
       - 8010:80
     depends_on: 
       - klipper
       # - klipper_another_printer
+    links:
+      - klipper:klipper
+      # - klipper_another_printer:klipper_another_printer
 
-#  mainsail:
-#    image: dimalo/mainsail
-#    build:
-#      dockerfile: Dockerfile
-#      context: frontend
-#      args:
-#        FRONTEND_ZIP_URL: https://github.com/meteyou/mainsail/releases/latest/download/mainsail.zip
-#    container_name: mainsail
-#    ports:
-#      - 8011:80
-#    depends_on: 
-#      - klipper
-#      # - klipper_another_printer
-
-  dwin:
-    image: dwin_t5uic1_lcd_dwin
-    #build:
-    # dockerfile: Dockerfile.asdf
-    # context: .
-    container_name: dwin
-    restart: unless-stopped
-    depends_on:
-     - klipper
-    environment:
-      - LOGLEVEL=${LOGLEVEL-INFO}
-      - DWIN_SERIAL=${DWIN_SERIAL-/dev/ttyS0}
-      - DWIN_ENCODER=${DWIN_ENCODER-25,24}
-      - DWIN_BUTTON=${DWIN_BUTTON-23}
-      - MOONRAKER_API_KEY=${MOONRAKER_API_KEY-}
-      - MOONRAKER_HOST=klipper
-      - MOONRAKER_PORT=${MOONRAKER_PORT-7125}
-    volumes:
-      - /sys:/sys
-      - /sys/devices/platform/soc/3f200000.gpio/gpiochip0:/sys/devices/platform/soc/3f200000.gpio/gpiochip0
-    devices:
-      # ensure container will have sufficient permission to read and write
-      - ${DWIN_SERIAL-/dev/ttyS0} # Serial device where screen is connected
-      - /dev/gpiomem
+  # mainsail:
+  #   image: dimalo/mainsail
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: frontend
+  #     args:
+  #       FRONTEND_ZIP_URL: https://github.com/meteyou/mainsail/releases/latest/download/mainsail.zip
+  #   container_name: mainsail
+  #   ports:
+  #     - 8011:80
+  #   depends_on: 
+  #     - klipper
+  #     # - klipper_another_printer
+  #   links:
+  #     - klipper:klipper
+  #     # - klipper_another_printer:klipper_another_printer
 
 volumes: 
   gcode_files:
