@@ -13,6 +13,6 @@ VOLUME ${HOME}/printer_data/logs
 
 USER root
 
-COPY klipper/supervisord.conf /etc/supervisord/conf.d/supervisord.conf
-COPY klipper/*.ini /etc/supervisord/
-CMD ["supervisord", "-c", "/etc/supervisord/conf.d/supervisord.conf"]
+COPY klipper/supervisord.conf /etc/supervisor/supervisord.conf
+COPY klipper/*.ini /etc/supervisor/conf.d/
+ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
