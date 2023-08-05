@@ -10,7 +10,7 @@ on:
   schedule:
     - cron: '42 13 * * 0'
   push:
-    branches: [ "ender3". "ender3-action-test" ]
+    branches: [ "ender3", "ender3-action-test" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
