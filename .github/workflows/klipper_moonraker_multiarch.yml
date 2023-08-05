@@ -76,7 +76,9 @@ jobs:
         with:
           context: .
           file: ./klipper/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+          # Let's not waste power on platforms i don't have
+          # If anyone beside me will use this image this will be extended
+          platforms: linux/arm/v7
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
