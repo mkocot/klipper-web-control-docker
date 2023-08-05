@@ -6,6 +6,7 @@ name: Klipper Moonraker Multiarch Image CI
 # documentation.
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '42 13 * * 0'
   push:
