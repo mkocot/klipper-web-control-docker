@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   klipper:
-    image: dimalo/klipper-moonraker
+    image: dimalo/klipper-moonraker:repack
     build:
       # use "repack" so this will not waste time building numpy
       dockerfile: ./klipper/repack.Dockerfile
@@ -22,8 +22,8 @@ services:
       - 7125:7125
     restart: unless-stopped
     volumes:
-      - moonraker_data:/home/klippy/printer_data
-      - gcode_files:/home/klippy/printer_data/gcodes
+      - moonraker_data_tmpfs:/home/klippy/printer_data/logs
+      - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/printer_data/config
@@ -67,7 +67,7 @@ services:
 
 
   fluidd:
-    image: cadriel/fluidd
+    image: dimalo/fluidd
     # build:
     #   dockerfile: Dockerfile
     #   context: frontend
@@ -93,32 +93,41 @@ services:
 #      - klipper
 #      # - klipper_another_printer
 
-  dwin:
-    image: dwin_t5uic1_lcd_dwin
-    #build:
-    # dockerfile: Dockerfile.asdf
-    # context: .
-    container_name: dwin
-    restart: unless-stopped
-    depends_on:
-     - klipper
-    environment:
-      - LOGLEVEL=${LOGLEVEL-INFO}
-      - DWIN_SERIAL=${DWIN_SERIAL-/dev/ttyS0}
-      - DWIN_ENCODER=${DWIN_ENCODER-25,24}
-      - DWIN_BUTTON=${DWIN_BUTTON-23}
-      - MOONRAKER_API_KEY=${MOONRAKER_API_KEY-}
-      - MOONRAKER_HOST=klipper
-      - MOONRAKER_PORT=${MOONRAKER_PORT-7125}
-    volumes:
-      - /sys:/sys
-      - /sys/devices/platform/soc/3f200000.gpio/gpiochip0:/sys/devices/platform/soc/3f200000.gpio/gpiochip0
-    devices:
-      # ensure container will have sufficient permission to read and write
-      - ${DWIN_SERIAL-/dev/ttyS0} # Serial device where screen is connected
-      - /dev/gpiomem
+#  dwin:
+#    image: dwin_t5uic1_lcd_dwin
+#    #build:
+#    # dockerfile: Dockerfile.asdf
+#    # context: .
+#    container_name: dwin
+#    restart: unless-stopped
+#    depends_on:
+#     - klipper
+#    environment:
+#      - LOGLEVEL=${LOGLEVEL-INFO}
+#      - DWIN_SERIAL=${DWIN_SERIAL-/dev/ttyS0}
+#      - DWIN_ENCODER=${DWIN_ENCODER-25,24}
+#      - DWIN_BUTTON=${DWIN_BUTTON-23}
+#      - MOONRAKER_API_KEY=${MOONRAKER_API_KEY-}
+#      - MOONRAKER_HOST=klipper
+#      - MOONRAKER_PORT=${MOONRAKER_PORT-7125}
+#    volumes:
+#      - /sys:/sys
+#      - /sys/devices/platform/soc/3f200000.gpio/gpiochip0:/sys/devices/platform/soc/3f200000.gpio/gpiochip0
+#    devices:
+#      # ensure container will have sufficient permission to read and write
+#      - ${DWIN_SERIAL-/dev/ttyS0} # Serial device where screen is connected
+#      - /dev/gpiomem
 
 volumes: 
   gcode_files:
+  gcode_files_tmpfs:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=50m
   moonraker_data:
-
+  moonraker_data_tmpfs:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=50m
