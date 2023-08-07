@@ -29,7 +29,8 @@ RUN apt-get update && \
 	gpiod \
 	libopenjp2-7 \
 	liblmdb-dev \
-	libsodium-dev
+	libsodium-dev \
+	cmake
 
 RUN sed -i -e 's/# en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
 RUN locale-gen
