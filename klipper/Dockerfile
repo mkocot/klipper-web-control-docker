@@ -32,10 +32,16 @@ RUN apt-get update && \
 	libsodium-dev \
 	cmake
 
-RUN sed -i -e 's/# en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
+RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen
 RUN locale-gen
+# Copy prebuild numpy wheels (with dependencies)
+COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
+# Copy prebuild matplotlib (with dependencies)
+COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
+#    pip install --no-index --find-links ${WHEELS} numpy matplotlib && \
+#
 RUN python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir -w ${WHEELS} supervisord-dependent-startup gpiod numpy matplotlib
+    pip wheel --no-cache-dir -w ${WHEELS} supervisord-dependent-startup gpiod
 
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
@@ -52,7 +58,7 @@ RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
 WORKDIR ${HOME}/klipper
 RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
-    ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir -f ${WHEELS} -r scripts/klippy-requirements.txt
+    ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir --find-links ${WHEELS} -r scripts/klippy-requirements.txt
 RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py
 RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
@@ -129,7 +135,7 @@ RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} 
 
 COPY --chown=${USER}:${USER} --from=builder ${WHEELS} ${WHEELS}
 
-RUN pip install --no-index -f ${WHEELS} supervisord-dependent-startup gpiod numpy matplotlib && \
+RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup gpiod numpy matplotlib && \
     mkdir -p /usr/lib/python3 && \
     ln -s /usr/local/lib/python3.11/site-packages /usr/lib/python3/dist-packages && \
     rm -Rf ${WHEELS}
