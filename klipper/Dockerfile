@@ -143,9 +143,14 @@ RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup 
 USER ${USER}
 WORKDIR ${HOME}
 
-RUN mkdir -p ${HOME}/gcodes ${CONFIG_DIR} ${HOME}/.moonraker ${HOME}/.klipper_repo_backup ${HOME}/.moonraker_repo_backup
+RUN mkdir -p ${DATA_DIR}/gcodes \
+	     ${DATA_DIR}/logs \
+	     ${CONFIG_DIR}
 
 VOLUME ${DATA_DIR}
+VOLUME ${DATA_DIR}/gcodes
+VOLUME ${DATA_DIR}/config
+VOLUME ${DATA_DIR}/logs
 
 EXPOSE 7125
 
