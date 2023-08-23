@@ -2,14 +2,13 @@ version: '3.4'
 
 services:
   klipper:
-    image: dimalo/klipper-moonraker:repack
-    build:
-      # use "repack" so this will not waste time building numpy
-      dockerfile: ./klipper/repack.Dockerfile
-      context: .
-      # args:
-      #   DEVICE_GROUP: device
-      #   DEVICE_GID: 987
+    image: ghcr.io/mkocot/klipper-web-control-docker:ender3
+    #build:
+    #  dockerfile: ./klipper/Dockerfile
+    #  context: .
+    #  # args:
+    #  #   DEVICE_GROUP: device
+    #  #   DEVICE_GID: 987
     # if klipper cannot connect to the printer check permissions on rpi then add the group here
     # group_add:
     #   - "996"
@@ -22,7 +21,8 @@ services:
       - 7125:7125
     restart: unless-stopped
     volumes:
-      - moonraker_data_tmpfs:/home/klippy/printer_data/logs
+      - moonraker_data:/home/klippy/printer_data
+      - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
       - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
@@ -30,6 +30,9 @@ services:
       - /dev:/dev
       # - <<your_config_path>>:/home/klippy/.config
       # - ./printer.cfg:/home/klippy/.config/printer.cfg
+    environment:
+        # Disable saving logs from moonraker
+        - 'MOONRAKER_DISABLE_FILE_LOG=True'
     # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
     # put <container_dev> into your printer.cfg
     #devices:
@@ -126,7 +129,7 @@ volumes:
       device: tmpfs
       o: size=50m
   moonraker_data:
-  moonraker_data_tmpfs:
+  moonraker_logs_tmpfs:
     driver_opts:
       type: tmpfs
       device: tmpfs
