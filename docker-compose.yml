@@ -80,7 +80,7 @@ services:
       # - klipper_another_printer
 
 #  mainsail:
-#    image: dimalo/mainsail
+#    image: ghcr.io/mainsail-crew/mainsail:latest
 #    build:
 #      dockerfile: Dockerfile
 #      context: frontend
