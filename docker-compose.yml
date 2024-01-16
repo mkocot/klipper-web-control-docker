@@ -70,10 +70,7 @@ services:
 
 
   fluidd:
-    image: dimalo/fluidd
-    # build:
-    #   dockerfile: Dockerfile
-    #   context: frontend
+    image: ghcr.io/fluidd-core/fluidd:latest
     restart: unless-stopped
     container_name: fluidd
     ports:
