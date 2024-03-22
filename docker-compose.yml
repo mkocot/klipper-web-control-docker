@@ -24,6 +24,8 @@ services:
       - moonraker_data:/home/klippy/printer_data
       - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
       - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
+      # bind secrets file to printer_data on docker
+      - ./config/moonraker.secrets:/home/klippy/printer_data/moonraker.secrets
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/printer_data/config
@@ -70,10 +72,7 @@ services:
 
 
   fluidd:
-    image: dimalo/fluidd
-    # build:
-    #   dockerfile: Dockerfile
-    #   context: frontend
+    image: ghcr.io/fluidd-core/fluidd:latest
     restart: unless-stopped
     container_name: fluidd
     ports:
@@ -83,7 +82,7 @@ services:
       # - klipper_another_printer
 
 #  mainsail:
-#    image: dimalo/mainsail
+#    image: ghcr.io/mainsail-crew/mainsail:latest
 #    build:
 #      dockerfile: Dockerfile
 #      context: frontend

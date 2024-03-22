@@ -1,4 +1,5 @@
 printer.cfg
 !config/printer.cfg
+config/moonraker.secrets
 .config
 build
