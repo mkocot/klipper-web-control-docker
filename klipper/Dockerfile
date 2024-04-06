@@ -32,8 +32,7 @@ RUN apt-get update && \
 	libsodium-dev \
 	cmake
 
-RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen
-RUN locale-gen
+RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
 RUN python -m pip install -U pip wheel && \
     pip wheel --no-cache-dir -w ${WHEELS} supervisord-dependent-startup gpiod
 
