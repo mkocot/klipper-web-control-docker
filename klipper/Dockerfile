@@ -153,8 +153,17 @@ COPY --chown=${USER}:${USER} --from=builder ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_D
 COPY --chown=${USER}:${USER} --from=builder ${HOME}/moonraker ${HOME}/moonraker
 COPY --chown=${USER}:${USER} --from=builder ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
 COPY --chown=${USER}:${USER} config ${CONFIG_DIR}
-COPY --chown=${USER}:${USER} klipper/run_in_venv /usr/local/bin/run_in_venv
 
 COPY klipper/supervisord.conf /etc/supervisor/supervisord.conf
 COPY klipper/*.ini /etc/supervisor/conf.d/
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+
+FROM image as image_full
+
+COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
+# Copy prebuild matplotlib (with dependencies)
+COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
+
+RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install -U pip wheel && \
+    pip wheel --no-cache-dir -w ${WHEELS} numpy matplotlib && \
+    rm -r /wheels

@@ -25,8 +25,10 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image_variant: ["image", "image_full"]
     permissions:
       contents: read
       packages: write
@@ -75,6 +77,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          target: ${{ matrix.image_variant }}
           file: ./klipper/Dockerfile
           # Let's not waste power on platforms i don't have
           # If anyone beside me will use this image this will be extended
