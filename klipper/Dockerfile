@@ -26,7 +26,6 @@ RUN apt-get update && \
 	build-essential \
 	libncurses-dev \
 	libusb-dev \
-	gpiod \
 	libopenjp2-7 \
 	liblmdb-dev \
 	libsodium-dev \
@@ -34,7 +33,7 @@ RUN apt-get update && \
 
 RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
 RUN python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir -w ${WHEELS} supervisord-dependent-startup gpiod
+    pip wheel --no-cache-dir --wheel-dir ${WHEELS} supervisord-dependent-startup
 
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
@@ -49,7 +48,10 @@ RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
 WORKDIR ${HOME}/klipper
 RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
-    ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir --find-links ${WHEELS} -r scripts/klippy-requirements.txt
+    ${KLIPPER_VENV_DIR}/bin/pip install \
+    	--no-cache-dir \
+	--find-links ${WHEELS} \
+	--requirement scripts/klippy-requirements.txt
 RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py
 RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
@@ -62,8 +64,11 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel gpiod && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install --no-cache-dir -f ${WHEELS} -r scripts/moonraker-requirements.txt
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install \
+    	--no-cache-dir \
+	--find-links ${WHEELS} \
+	--requirement scripts/moonraker-requirements.txt
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 FROM python:3.11-slim-bullseye as image
@@ -74,7 +79,6 @@ RUN apt-get update && \
     apt-get install -y \
     curl \
     git \
-    gpiod \
     iproute2 \
     libcurl4-openssl-dev \
     libjpeg-dev \
@@ -126,8 +130,11 @@ RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} 
 
 COPY --chown=${USER}:${USER} --from=builder ${WHEELS} ${WHEELS}
 
-RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup gpiod && \
-    mkdir -p /usr/lib/python3 && \
+USER ${USER}
+RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup
+
+USER root
+RUN mkdir -p /usr/lib/python3 && \
     ln -s /usr/local/lib/python3.11/site-packages /usr/lib/python3/dist-packages && \
     rm -Rf ${WHEELS}
 
@@ -165,5 +172,5 @@ COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
 COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir -w ${WHEELS} numpy matplotlib && \
+    pip wheel --no-cache-dir --no-index --find-links ${WHEELS} numpy matplotlib && \
     rm -r /wheels
