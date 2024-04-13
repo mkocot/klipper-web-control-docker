@@ -139,14 +139,8 @@ RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} 
     mkdir -p /var/log/klipper && \
     chown -R ${USER}:${USER} /var/log/klipper ${HOME}
 
-COPY --chown=${USER}:${USER} --from=builder ${WHEELS} ${WHEELS}
-
-USER ${USER}
-RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup
-
-USER root
-RUN mkdir -p /usr/lib/python3 && \
-    ln -s /usr/local/lib/python3.11/site-packages /usr/lib/python3/dist-packages && \
+COPY --from=builder ${WHEELS} ${WHEELS}
+RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup && \
     rm -Rf ${WHEELS}
 
 USER ${USER}
