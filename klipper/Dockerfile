@@ -1,15 +1,23 @@
-FROM python:3.11-bullseye as builder
-
-ARG DEBIAN_FRONTEND=noninteractive
-ARG KLIPPER_BRANCH="master"
-ARG MOONRAKER_BRANCH="master"
-
+# common shared params
+ARG WHEELS=/wheels
 ARG USER=klippy
 ARG HOME=/home/${USER}
 ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
+ARG DEBIAN_FRONTEND=noninteractive
 
-ENV WHEELS=/wheels
+# builder phase
+FROM python:3.11-bullseye as builder
+
+ARG DEBIAN_FRONTEND
+ARG USER
+ARG HOME
+ARG KLIPPER_VENV_DIR
+ARG MOONRAKER_VENV_DIR
+ARG WHEELS
+
+ARG KLIPPER_BRANCH="master"
+ARG MOONRAKER_BRANCH="master"
 ENV PYTHONUNBUFFERED=1
 
 RUN useradd -d ${HOME} -ms /bin/bash ${USER}
@@ -71,9 +79,28 @@ RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
 	--requirement scripts/moonraker-requirements.txt
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
+# base image with klipper and moonraker
 FROM python:3.11-slim-bullseye as image
 
-ARG DEBIAN_FRONTEND=noninteractive
+# Use default values
+ARG DEBIAN_FRONTEND
+ARG USER
+ARG HOME
+ARG KLIPPER_VENV_DIR
+ARG MOONRAKER_VENV_DIR
+ARG WHEELS
+
+# customize
+ENV DATA_DIR=${HOME}/printer_data
+ENV CONFIG_DIR=${DATA_DIR}/config
+ENV LC_ALL en_GB.UTF-8 
+ENV LANG en_GB.UTF-8  
+ENV LANGUAGE en_GB:en   
+
+ENV PYTHONUNBUFFERED=1
+
+ARG DEVICE_GROUP=device
+ARG DEVICE_GID=987
 
 RUN apt-get update && \
     apt-get install -y \
@@ -98,22 +125,6 @@ RUN apt-get update && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-ENV LC_ALL en_GB.UTF-8 
-ENV LANG en_GB.UTF-8  
-ENV LANGUAGE en_GB:en   
-
-ARG USER=klippy
-ARG HOME=/home/${USER}
-ENV DATA_DIR=${HOME}/printer_data
-ENV CONFIG_DIR=${DATA_DIR}/config
-ENV KLIPPER_VENV_DIR=${HOME}/klippy-env
-ENV MOONRAKER_VENV_DIR=${HOME}/moonraker-env
-
-ENV WHEELS=/wheels
-ENV PYTHONUNBUFFERED=1
-
-ARG DEVICE_GROUP=device
-ARG DEVICE_GID=987
 
 
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
@@ -165,12 +176,18 @@ COPY klipper/supervisord.conf /etc/supervisor/supervisord.conf
 COPY klipper/*.ini /etc/supervisor/conf.d/
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
 
+# extended image with matplotlib and numpy for resonance calibration
 FROM image as image_full
+
+# use default values
+ARG WHEELS
+ARG KLIPPER_VENV_DIR
 
 COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
 # Copy prebuild matplotlib (with dependencies)
 COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
 
-RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir --no-index --find-links ${WHEELS} numpy matplotlib && \
-    rm -r /wheels
+RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
+    ${KLIPPER_VENV_DIR}/bin/python -m pip install \
+	--no-cache-dir --no-index --find-links ${WHEELS} numpy matplotlib && \
+    rm -r ${WHEELS}
