@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   klipper:
-    image: ghcr.io/mkocot/klipper-web-control-docker:ender3
+    image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper
     #build:
     #  dockerfile: ./klipper/Dockerfile
     #  context: .
@@ -15,8 +15,38 @@ services:
     #   - "998"
     container_name: klipper
     privileged: true
+    restart: unless-stopped
+    volumes:
+      - moonraker_data:/home/klippy/printer_data
+      - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
+      - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
+      # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
+      # that way you can merge upstream changes to your customized configs
+      - ./config:/home/klippy/printer_data/config
+      # /dev is required for (dynamic) sharing printer and host serial
+      - /dev:/dev
+    # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
+    # put <container_dev> into your printer.cfg
+    #devices:
+    #  - /dev/ttyUSB0:/dev/ttyUSB0
+  klipper_mcu:
+    image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper_mcu
+    #user: root
+    container_name: klipper_mcu
+    privileged: true
     cap_add:
       - sys_nice
+    restart: unless-stopped
+    volumes:
+      - moonraker_data:/home/klippy/printer_data
+      # /dev is required for sharing host serial
+      - /dev:/dev
+    depends_on: 
+      - klipper
+  moonraker:
+    image: ghcr.io/mkocot/klipper-web-control-docker:ender3-moonraker
+    container_name: moonraker
+    privileged: false
     ports:
       - 7125:7125
     restart: unless-stopped
@@ -29,46 +59,12 @@ services:
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/printer_data/config
-      - /dev:/dev
-      # - <<your_config_path>>:/home/klippy/.config
-      # - ./printer.cfg:/home/klippy/.config/printer.cfg
     environment:
         # Disable saving logs from moonraker
         - 'MOONRAKER_DISABLE_FILE_LOG=True'
-    # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
-    # put <container_dev> into your printer.cfg
-    #devices:
-    #  - /dev/ttyUSB0:/dev/ttyUSB0
-
-  ##################################################################
-  # Example config for a second printer on a different serial port
-  ##################################################################
-
-  # klipper_another_printer:
-  #   image: dimalo/klipper-moonraker
-  #   build:
-  #     dockerfile: ./klipper/Dockerfile
-  #     context: .
-  #     # args:
-  #     #   DEVICE_GROUP: device
-  #     #   DEVICE_GID: 987
-  #   container_name: klipper_another_printer
-  #   ports:
-  #     # As 7125 is already used by the first printer, we map this moonraker's port to 7126 on the host
-  #     - 7126:7125
-  #   restart: unless-stopped
-  #   volumes:
-  #     # Let both klipper instances use the same storage for gcode files
-  #     - gcode_files:/home/klippy/gcode_files
-  #     # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
-  #     # that way you can merge upstream changes to your (developed) configs...
-  #     - ./config_another_printer:/home/klippy/.config
-  #     # - <<your_config_path>>:/home/klippy/.config
-  #     # - ./another_printer.cfg:/home/klippy/.config/printer.cfg
-  #   # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
-  #   # put <container_dev> into your printer.cfg
-  #   devices:
-  #     - /dev/ttyACM0:/dev/ttyACM0
+    depends_on: 
+      - klipper
+      - klipper_mcu
 
 
   fluidd:
@@ -78,47 +74,7 @@ services:
     ports:
       - 8010:80
     depends_on: 
-      - klipper
-      # - klipper_another_printer
-
-#  mainsail:
-#    image: ghcr.io/mainsail-crew/mainsail:latest
-#    build:
-#      dockerfile: Dockerfile
-#      context: frontend
-#      args:
-#        FRONTEND_ZIP_URL: https://github.com/meteyou/mainsail/releases/latest/download/mainsail.zip
-#    container_name: mainsail
-#    ports:
-#      - 8011:80
-#    depends_on: 
-#      - klipper
-#      # - klipper_another_printer
-
-#  dwin:
-#    image: dwin_t5uic1_lcd_dwin
-#    #build:
-#    # dockerfile: Dockerfile.asdf
-#    # context: .
-#    container_name: dwin
-#    restart: unless-stopped
-#    depends_on:
-#     - klipper
-#    environment:
-#      - LOGLEVEL=${LOGLEVEL-INFO}
-#      - DWIN_SERIAL=${DWIN_SERIAL-/dev/ttyS0}
-#      - DWIN_ENCODER=${DWIN_ENCODER-25,24}
-#      - DWIN_BUTTON=${DWIN_BUTTON-23}
-#      - MOONRAKER_API_KEY=${MOONRAKER_API_KEY-}
-#      - MOONRAKER_HOST=klipper
-#      - MOONRAKER_PORT=${MOONRAKER_PORT-7125}
-#    volumes:
-#      - /sys:/sys
-#      - /sys/devices/platform/soc/3f200000.gpio/gpiochip0:/sys/devices/platform/soc/3f200000.gpio/gpiochip0
-#    devices:
-#      # ensure container will have sufficient permission to read and write
-#      - ${DWIN_SERIAL-/dev/ttyS0} # Serial device where screen is connected
-#      - /dev/gpiomem
+      - moonraker
 
 volumes: 
   gcode_files:

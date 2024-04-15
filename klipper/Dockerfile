@@ -1,15 +1,24 @@
-FROM python:3.11-bullseye as builder
-
-ARG DEBIAN_FRONTEND=noninteractive
-ARG KLIPPER_BRANCH="master"
-ARG MOONRAKER_BRANCH="master"
-
+# common shared params
+ARG WHEELS=/wheels
 ARG USER=klippy
 ARG HOME=/home/${USER}
 ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
+ARG DEBIAN_FRONTEND=noninteractive
 
-ENV WHEELS=/wheels
+# STAGE: builder
+# inermediate builder phase (not exported)
+FROM python:3.11-bullseye as builder
+
+ARG DEBIAN_FRONTEND
+ARG USER
+ARG HOME
+ARG KLIPPER_VENV_DIR
+ARG MOONRAKER_VENV_DIR
+ARG WHEELS
+
+ARG KLIPPER_BRANCH="master"
+ARG MOONRAKER_BRANCH="master"
 ENV PYTHONUNBUFFERED=1
 
 RUN useradd -d ${HOME} -ms /bin/bash ${USER}
@@ -26,22 +35,12 @@ RUN apt-get update && \
 	build-essential \
 	libncurses-dev \
 	libusb-dev \
-	gpiod \
 	libopenjp2-7 \
 	liblmdb-dev \
 	libsodium-dev \
 	cmake
 
-RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen
-RUN locale-gen
-# Copy prebuild numpy wheels (with dependencies)
-COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
-# Copy prebuild matplotlib (with dependencies)
-COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
-#    pip install --no-index --find-links ${WHEELS} numpy matplotlib && \
-#
-RUN python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir -w ${WHEELS} supervisord-dependent-startup gpiod
+RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
 
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
@@ -52,13 +51,14 @@ WORKDIR ${HOME}
 
 ### Klipper setup ###
 RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klipper3d/klipper.git klipper
-RUN git clone --single-branch --branch master https://github.com/protoloft/klipper_z_calibration.git klipper_z_calibration
-RUN ln -sf klipper_z_calibration/z_calibration.py klipper/klippy/extras/z_calibration.py
 RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
 WORKDIR ${HOME}/klipper
 RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
-    ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir --find-links ${WHEELS} -r scripts/klippy-requirements.txt
+    ${KLIPPER_VENV_DIR}/bin/pip install \
+    	--no-cache-dir \
+	--find-links ${WHEELS} \
+	--requirement scripts/klippy-requirements.txt
 RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py
 RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
@@ -71,19 +71,46 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel gpiod && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install --no-cache-dir -f ${WHEELS} -r scripts/moonraker-requirements.txt
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install \
+    	--no-cache-dir \
+	--find-links ${WHEELS} \
+	--requirement scripts/moonraker-requirements.txt
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
+
+# STAGE: image
+# image with dependencies for klipper and moonraker (not exported)
 FROM python:3.11-slim-bullseye as image
 
-ARG DEBIAN_FRONTEND=noninteractive
+# Use default values
+ARG DEBIAN_FRONTEND
+ARG HOME
+ARG KLIPPER_VENV_DIR
+ARG MOONRAKER_VENV_DIR
+ARG USER
+ARG WHEELS
+
+# export ARGS as ENVS
+ENV HOME ${HOME}
+ENV KLIPPER_VENV_DIR ${KLIPPER_VENV_DIR}
+ENV MOONRAKER_VENV_DIR ${MOONRAKER_VENV_DIR}
+ENV USER ${USER}
+ENV WHEELS ${WHEELS}
+
+# customize
+ENV DATA_DIR=${HOME}/printer_data
+ENV CONFIG_DIR=${DATA_DIR}/config
+
+ENV PYTHONUNBUFFERED=1
+
+ARG DEVICE_GROUP=device
+ARG DEVICE_GID=987
 
 RUN apt-get update && \
     apt-get install -y \
     curl \
     git \
-    gpiod \
     iproute2 \
     libcurl4-openssl-dev \
     libjpeg-dev \
@@ -94,7 +121,6 @@ RUN apt-get update && \
     libtiff5 \
     locales \
     rsync \
-    supervisor \
     zlib1g-dev && \
     sed -i -e 's/# en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen && \
     locale-gen && \
@@ -107,38 +133,13 @@ ENV LC_ALL en_GB.UTF-8
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
 
-ARG USER=klippy
-ARG HOME=/home/${USER}
-ENV DATA_DIR=${HOME}/printer_data
-ENV CONFIG_DIR=${DATA_DIR}/config
-ENV KLIPPER_VENV_DIR=${HOME}/klippy-env
-ENV MOONRAKER_VENV_DIR=${HOME}/moonraker-env
-
-ENV WHEELS=/wheels
-ENV PYTHONUNBUFFERED=1
-
-ARG DEVICE_GROUP=device
-ARG DEVICE_GID=987
-
-
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
     groupadd -g ${DEVICE_GID} ${DEVICE_GROUP} && \
     usermod -a -G ${DEVICE_GROUP} ${USER} && \
     usermod -a -G tty ${USER} && \
     usermod -a -G dialout ${USER} && \
-    mkdir -p /var/log/supervisor ${HOME}/.cache/pip && \
-    touch /var/log/supervisor/supervisord.log && \
-    chown -R root:${USER} /var/log/supervisor && \
-    chmod -R g=u /var/log/supervisor && \
     mkdir -p /var/log/klipper && \
     chown -R ${USER}:${USER} /var/log/klipper ${HOME}
-
-COPY --chown=${USER}:${USER} --from=builder ${WHEELS} ${WHEELS}
-
-RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup gpiod numpy matplotlib && \
-    mkdir -p /usr/lib/python3 && \
-    ln -s /usr/local/lib/python3.11/site-packages /usr/lib/python3/dist-packages && \
-    rm -Rf ${WHEELS}
 
 USER ${USER}
 WORKDIR ${HOME}
@@ -150,21 +151,56 @@ RUN mkdir -p ${DATA_DIR}/gcodes \
 VOLUME ${DATA_DIR}
 VOLUME ${DATA_DIR}/gcodes
 VOLUME ${DATA_DIR}/config
-VOLUME ${DATA_DIR}/logs
+VOLUME ${CONFIG_DIR}
 
 EXPOSE 7125
 
-USER root
+USER ${USER}
 
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper_z_calibration ${HOME}/klipper_z_calibration
+# STAGE: klipper
+# prepare image containing klipper venv
+FROM image as klipper
+
 COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper ${HOME}/klipper
 COPY --chown=${USER}:${USER} --from=builder ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_DIR}
+
+CMD ${KLIPPER_VENV_DIR}/bin/python klipper/klippy/klippy.py -a ${DATA_DIR}/comms/klippy_uds -l ${DATA_DIR}/logs/klipper.log ${CONFIG_DIR}/klipper.cfg
+
+# STAGE: klipper_mcu
+# prepare image with klipper mcu host
+FROM image as klipper_mcu
+
+USER root
+COPY --from=builder ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
+
+CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/klipper_host_mcu"]
+
+# STAGE: moonraker
+# prepare image containing moonraker venv
+FROM image as moonraker
+
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/config ${HOME}/klipper/config
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/docs ${HOME}/klipper/docs
 COPY --chown=${USER}:${USER} --from=builder ${HOME}/moonraker ${HOME}/moonraker
 COPY --chown=${USER}:${USER} --from=builder ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
-COPY --chown=${USER}:${USER} config ${CONFIG_DIR}
-COPY --chown=${USER}:${USER} klipper/run_in_venv /usr/local/bin/run_in_venv
 
-COPY klipper/supervisord.conf /etc/supervisor/supervisord.conf
-COPY klipper/*.ini /etc/supervisor/conf.d/
-CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+ENV MOONRAKER_VENV_DIR=${MOONRAKER_VENV_DIR}
+
+CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
+
+# STAGE: klipper_full
+# extended image with matplotlib and numpy for resonance calibration
+FROM klipper as klipper_full
+
+ENV OUR_WHEELS /tmp/wheels
+# Copy prebuild dumpy (with dependencies)
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-numpy:master ${WHEELS} ${OUR_WHEELS}
+# Copy prebuild matplotlib (with dependencies)
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-matplotlib:master ${WHEELS} ${OUR_WHEELS}
+
+RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
+    ${KLIPPER_VENV_DIR}/bin/python -m pip install \
+        --no-cache-dir --no-index --find-links ${OUR_WHEELS} numpy matplotlib && \
+    rm -r ${OUR_WHEELS}
+
+
