@@ -194,12 +194,15 @@ CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_
 # extended image with matplotlib and numpy for resonance calibration
 FROM klipper as klipper_full
 
+ENV OUR_WHEELS /tmp/wheels
 # Copy prebuild dumpy (with dependencies)
-COPY --from=ghcr.io/mkocot/docker-numpy:master ${WHEELS} ${WHEELS}
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-numpy:master ${WHEELS} ${OUR_WHEELS}
 # Copy prebuild matplotlib (with dependencies)
-COPY --from=ghcr.io/mkocot/docker-matplotlib:master ${WHEELS} ${WHEELS}
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-matplotlib:master ${WHEELS} ${OUR_WHEELS}
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
-	--no-cache-dir --no-index --find-links ${WHEELS} numpy matplotlib && \
-    rm -r ${WHEELS}
+        --no-cache-dir --no-index --find-links ${OUR_WHEELS} numpy matplotlib && \
+    rm -r ${OUR_WHEELS}
+
+
