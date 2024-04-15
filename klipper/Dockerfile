@@ -6,7 +6,8 @@ ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
 ARG DEBIAN_FRONTEND=noninteractive
 
-# builder phase
+# STAGE: builder
+# inermediate builder phase (not exported)
 FROM python:3.11-bullseye as builder
 
 ARG DEBIAN_FRONTEND
@@ -40,8 +41,6 @@ RUN apt-get update && \
 	cmake
 
 RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
-RUN python -m pip install -U pip wheel && \
-    pip wheel --no-cache-dir --wheel-dir ${WHEELS} supervisord-dependent-startup
 
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
@@ -79,23 +78,29 @@ RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
 	--requirement scripts/moonraker-requirements.txt
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
-# base image with klipper and moonraker
+
+# STAGE: image
+# image with dependencies for klipper and moonraker (not exported)
 FROM python:3.11-slim-bullseye as image
 
 # Use default values
 ARG DEBIAN_FRONTEND
-ARG USER
 ARG HOME
 ARG KLIPPER_VENV_DIR
 ARG MOONRAKER_VENV_DIR
+ARG USER
 ARG WHEELS
+
+# export ARGS as ENVS
+ENV HOME ${HOME}
+ENV KLIPPER_VENV_DIR ${KLIPPER_VENV_DIR}
+ENV MOONRAKER_VENV_DIR ${MOONRAKER_VENV_DIR}
+ENV USER ${USER}
+ENV WHEELS ${WHEELS}
 
 # customize
 ENV DATA_DIR=${HOME}/printer_data
 ENV CONFIG_DIR=${DATA_DIR}/config
-ENV LC_ALL en_GB.UTF-8 
-ENV LANG en_GB.UTF-8  
-ENV LANGUAGE en_GB:en   
 
 ENV PYTHONUNBUFFERED=1
 
@@ -116,7 +121,6 @@ RUN apt-get update && \
     libtiff5 \
     locales \
     rsync \
-    supervisor \
     zlib1g-dev && \
     sed -i -e 's/# en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen && \
     locale-gen && \
@@ -125,23 +129,17 @@ RUN apt-get update && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-
+ENV LC_ALL en_GB.UTF-8 
+ENV LANG en_GB.UTF-8  
+ENV LANGUAGE en_GB:en   
 
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
     groupadd -g ${DEVICE_GID} ${DEVICE_GROUP} && \
     usermod -a -G ${DEVICE_GROUP} ${USER} && \
     usermod -a -G tty ${USER} && \
     usermod -a -G dialout ${USER} && \
-    mkdir -p /var/log/supervisor ${HOME}/.cache/pip && \
-    touch /var/log/supervisor/supervisord.log && \
-    chown -R root:${USER} /var/log/supervisor && \
-    chmod -R g=u /var/log/supervisor && \
     mkdir -p /var/log/klipper && \
     chown -R ${USER}:${USER} /var/log/klipper ${HOME}
-
-COPY --from=builder ${WHEELS} ${WHEELS}
-RUN pip install --no-index --find-links ${WHEELS} supervisord-dependent-startup && \
-    rm -Rf ${WHEELS}
 
 USER ${USER}
 WORKDIR ${HOME}
@@ -153,33 +151,53 @@ RUN mkdir -p ${DATA_DIR}/gcodes \
 VOLUME ${DATA_DIR}
 VOLUME ${DATA_DIR}/gcodes
 VOLUME ${DATA_DIR}/config
-VOLUME ${DATA_DIR}/logs
+VOLUME ${CONFIG_DIR}
 
 EXPOSE 7125
 
-USER root
+USER ${USER}
 
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper ${HOME}/klipper
-COPY --chown=${USER}:${USER} --from=builder ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_DIR}
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/moonraker ${HOME}/moonraker
-COPY --chown=${USER}:${USER} --from=builder ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
 COPY --chown=${USER}:${USER} config ${CONFIG_DIR}
 
-COPY klipper/supervisord.conf /etc/supervisor/supervisord.conf
-COPY klipper/*.ini /etc/supervisor/conf.d/
-CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# STAGE: klipper
+# prepare image containing klipper venv
+FROM image as klipper
 
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper ${HOME}/klipper
+COPY --chown=${USER}:${USER} --from=builder ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_DIR}
+
+CMD ${KLIPPER_VENV_DIR}/bin/python klipper/klippy/klippy.py -a ${DATA_DIR}/comms/klippy_uds -l ${DATA_DIR}/logs/klipper.log ${CONFIG_DIR}/klipper.cfg
+
+# STAGE: klipper_mcu
+# prepare image with klipper mcu host
+FROM image as klipper_mcu
+
+USER root
+COPY --from=builder ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
+
+CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/klipper_host_mcu"]
+
+# STAGE: moonraker
+# prepare image containing moonraker venv
+FROM image as moonraker
+
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/config ${HOME}/klipper/config
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/docs ${HOME}/klipper/docs
+COPY --chown=${USER}:${USER} --from=builder ${HOME}/moonraker ${HOME}/moonraker
+COPY --chown=${USER}:${USER} --from=builder ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
+
+ENV MOONRAKER_VENV_DIR=${MOONRAKER_VENV_DIR}
+
+CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
+
+# STAGE: klipper_full
 # extended image with matplotlib and numpy for resonance calibration
-FROM image as image_full
+FROM klipper as klipper_full
 
-# use default values
-ARG WHEELS
-ARG KLIPPER_VENV_DIR
-
-COPY --from=ghcr.io/mkocot/docker-numpy:master /wheels ${WHEELS}
+# Copy prebuild dumpy (with dependencies)
+COPY --from=ghcr.io/mkocot/docker-numpy:master ${WHEELS} ${WHEELS}
 # Copy prebuild matplotlib (with dependencies)
-COPY --from=ghcr.io/mkocot/docker-matplotlib:master /wheels ${WHEELS}
+COPY --from=ghcr.io/mkocot/docker-matplotlib:master ${WHEELS} ${WHEELS}
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
