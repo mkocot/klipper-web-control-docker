@@ -157,8 +157,6 @@ EXPOSE 7125
 
 USER ${USER}
 
-COPY --chown=${USER}:${USER} config ${CONFIG_DIR}
-
 # STAGE: klipper
 # prepare image containing klipper venv
 FROM image as klipper
