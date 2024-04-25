@@ -46,6 +46,9 @@ ENV LC_ALL en_GB.UTF-8
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
 
+# use binary wheels
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-pillow:10.2.0 ${WHEELS} ${WHEELS}
+
 USER ${USER}
 WORKDIR ${HOME}
 
