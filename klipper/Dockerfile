@@ -57,7 +57,7 @@ RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klip
 RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
 WORKDIR ${HOME}/klipper
-RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
+RUN ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir wheel && \
     ${KLIPPER_VENV_DIR}/bin/pip install \
     	--no-cache-dir \
 	--find-links ${WHEELS} \
@@ -74,7 +74,7 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install --no-cache-dir wheel shapely && \
     ${MOONRAKER_VENV_DIR}/bin/pip install \
     	--no-cache-dir \
 	--find-links ${WHEELS} \
