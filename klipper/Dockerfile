@@ -66,8 +66,7 @@ RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py
 RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
 COPY klipper/config_linux_mcu ./.config
-# Looks like something on github is too eager to reuse old .o files
-RUN make clean && make
+RUN make
 
 WORKDIR ${HOME}
 # Install moonraker
