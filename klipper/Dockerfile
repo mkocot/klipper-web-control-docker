@@ -46,6 +46,9 @@ ENV LC_ALL en_GB.UTF-8
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
 
+# use binary wheels
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-pillow:latest ${WHEELS} ${WHEELS}
+
 USER ${USER}
 WORKDIR ${HOME}
 
@@ -194,9 +197,9 @@ FROM klipper as klipper_full
 
 ENV OUR_WHEELS /tmp/wheels
 # Copy prebuild dumpy (with dependencies)
-COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-numpy:master ${WHEELS} ${OUR_WHEELS}
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-numpy:latest ${WHEELS} ${OUR_WHEELS}
 # Copy prebuild matplotlib (with dependencies)
-COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-matplotlib:master ${WHEELS} ${OUR_WHEELS}
+COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-matplotlib:latest ${WHEELS} ${OUR_WHEELS}
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
