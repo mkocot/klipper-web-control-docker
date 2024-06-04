@@ -5,10 +5,12 @@ ARG HOME=/home/${USER}
 ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
 ARG DEBIAN_FRONTEND=noninteractive
+ARG PYTHON_VERSION=3.11
+ARG DEBIAN_VERSION=bullseye
 
 # STAGE: builder
 # inermediate builder phase (not exported)
-FROM python:3.11-bullseye as builder
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} as builder
 
 ARG DEBIAN_FRONTEND
 ARG USER
@@ -46,8 +48,8 @@ ENV LC_ALL en_GB.UTF-8
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
 
-# use binary wheels
-COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-pillow:latest ${WHEELS} ${WHEELS}
+# Configure armv7 repository
+RUN printf "[global]\nextra-index-url=https://www.piwheels.org/simple\n" >> /etc/pip.conf
 
 USER ${USER}
 WORKDIR ${HOME}
@@ -57,12 +59,9 @@ RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klip
 RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
 WORKDIR ${HOME}/klipper
-RUN ${KLIPPER_VENV_DIR}/bin/pip install --no-cache-dir wheel && \
+RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
     ${KLIPPER_VENV_DIR}/bin/pip install \
-    	--no-cache-dir \
-	--find-links ${WHEELS} \
 	--requirement scripts/klippy-requirements.txt
-RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py
 RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
 COPY klipper/config_linux_mcu ./.config
@@ -74,17 +73,15 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install --no-cache-dir wheel shapely && \
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel shapely && \
     ${MOONRAKER_VENV_DIR}/bin/pip install \
-    	--no-cache-dir \
-	--find-links ${WHEELS} \
 	--requirement scripts/moonraker-requirements.txt
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 
 # STAGE: image
 # image with dependencies for klipper and moonraker (not exported)
-FROM python:3.11-slim-bullseye as image
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} as image
 
 # Use default values
 ARG DEBIAN_FRONTEND
@@ -92,14 +89,12 @@ ARG HOME
 ARG KLIPPER_VENV_DIR
 ARG MOONRAKER_VENV_DIR
 ARG USER
-ARG WHEELS
 
 # export ARGS as ENVS
 ENV HOME ${HOME}
 ENV KLIPPER_VENV_DIR ${KLIPPER_VENV_DIR}
 ENV MOONRAKER_VENV_DIR ${MOONRAKER_VENV_DIR}
 ENV USER ${USER}
-ENV WHEELS ${WHEELS}
 
 # customize
 ENV DATA_DIR=${HOME}/printer_data
@@ -135,6 +130,9 @@ RUN apt-get update && \
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
+
+# Configure armv7 repository
+RUN printf "[global]\nextra-index-url=https://www.piwheels.org/simple\n" >> /etc/pip.conf
 
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
     groupadd -g ${DEVICE_GID} ${DEVICE_GROUP} && \
@@ -195,15 +193,6 @@ CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_
 # extended image with matplotlib and numpy for resonance calibration
 FROM klipper as klipper_full
 
-ENV OUR_WHEELS /tmp/wheels
-# Copy prebuild dumpy (with dependencies)
-COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-numpy:latest ${WHEELS} ${OUR_WHEELS}
-# Copy prebuild matplotlib (with dependencies)
-COPY --chown=${USER}:${USER} --from=ghcr.io/mkocot/docker-matplotlib:latest ${WHEELS} ${OUR_WHEELS}
-
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
-        --no-cache-dir --no-index --find-links ${OUR_WHEELS} numpy matplotlib && \
-    rm -r ${OUR_WHEELS}
-
-
+        --no-cache-dir numpy matplotlib
