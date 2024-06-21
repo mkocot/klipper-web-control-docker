@@ -1,7 +1,7 @@
-printer.cfg
-!config/printer.cfg
-config/moonraker.secrets
-config/klipper-*_*.cfg
-.config
-build
+/config/klipper.cfg
+/config/klipper-*_*.cfg
+/config/moonraker.secrets
+/config/.moonraker.conf.bkp
+/.config
+/build
 /resonances_*.csv
