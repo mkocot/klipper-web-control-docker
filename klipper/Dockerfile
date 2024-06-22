@@ -101,7 +101,7 @@ RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 # STAGE: image
 # image with dependencies for klipper and moonraker (not exported)
-FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} as image
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS image
 
 # Use default values
 ARG DEBIAN_FRONTEND
@@ -182,25 +182,25 @@ USER ${USER}
 
 # STAGE: klipper
 # prepare image containing klipper venv
-FROM image as klipper
+FROM image AS klipper
 
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper ${HOME}/klipper
-COPY --chown=${USER}:${USER} --from=builder ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_DIR}
+COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper ${HOME}/klipper
+COPY --chown=${USER}:${USER} --from=builder_klipper ${KLIPPER_VENV_DIR} ${KLIPPER_VENV_DIR}
 
 CMD ${KLIPPER_VENV_DIR}/bin/python klipper/klippy/klippy.py -a ${DATA_DIR}/comms/klippy_uds -l ${DATA_DIR}/logs/klipper.log ${CONFIG_DIR}/klipper.cfg
 
 # STAGE: klipper_mcu
 # prepare image with klipper mcu host
-FROM image as klipper_mcu
+FROM image AS klipper_mcu
 
 USER root
-COPY --from=builder ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
+COPY --from=builder_klipper ${HOME}/klipper/out/klipper.elf /usr/local/bin/klipper_mcu
 
 CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/klipper_host_mcu"]
 
 # STAGE: moonraker
 # prepare image containing moonraker venv
-FROM image as moonraker
+FROM image AS moonraker
 
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/config ${HOME}/klipper/config
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/docs ${HOME}/klipper/docs
@@ -213,7 +213,7 @@ CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_
 
 # STAGE: klipper_full
 # extended image with matplotlib and numpy for resonance calibration
-FROM klipper as klipper_full
+FROM klipper AS klipper_full
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
