@@ -122,6 +122,7 @@ RUN apt-get update && \
     libsodium-dev \
     libssl-dev \
     libtiff6 \
+    libgeos-c1v5 \
     locales \
     rsync \
     zlib1g-dev && \
@@ -200,4 +201,4 @@ FROM klipper as klipper_full
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
-        --no-cache-dir numpy matplotlib
+        --no-cache-dir 'numpy<2' matplotlib
