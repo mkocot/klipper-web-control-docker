@@ -73,9 +73,10 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel shapely && \
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
     ${MOONRAKER_VENV_DIR}/bin/pip install \
-	--requirement scripts/moonraker-requirements.txt
+	--requirement scripts/moonraker-requirements.txt && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install shapely
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 
