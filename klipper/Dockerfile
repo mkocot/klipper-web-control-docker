@@ -54,7 +54,8 @@ USER ${USER}
 WORKDIR ${HOME}
 
 ### Klipper setup ###
-STAGE: builder_klipper
+# STAGE: builder_klipper
+# image with build dependencies for klipper (not exported)
 FROM builder_base AS builder_klipper
 ARG MOONRAKER_VENV_DIR
 ARG MOONRAKER_BRANCH
@@ -74,6 +75,8 @@ RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py && \
 COPY klipper/config_linux_mcu ./.config
 RUN make
 
+# STAGE: builder_moonraker
+# image with build dependencies for moonraker (not exported)
 FROM builder_base AS builder_moonraker
 ARG MOONRAKER_VENV_DIR
 ARG MOONRAKER_BRANCH
