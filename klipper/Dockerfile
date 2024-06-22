@@ -2,25 +2,24 @@
 ARG WHEELS=/wheels
 ARG USER=klippy
 ARG HOME=/home/${USER}
+ARG KLIPPER_BRANCH="master"
 ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
+ARG MOONRAKER_BRANCH="master"
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PYTHON_VERSION=3.11
 ARG DEBIAN_VERSION=bookworm
 
-# STAGE: builder
+# STAGE: builder_base
 # inermediate builder phase (not exported)
-FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} as builder
+FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS builder_base
 
 ARG DEBIAN_FRONTEND
 ARG USER
 ARG HOME
 ARG KLIPPER_VENV_DIR
-ARG MOONRAKER_VENV_DIR
-ARG WHEELS
+ARG KLIPPER_BRANCH
 
-ARG KLIPPER_BRANCH="master"
-ARG MOONRAKER_BRANCH="master"
 ENV PYTHONUNBUFFERED=1
 
 RUN useradd -d ${HOME} -ms /bin/bash ${USER}
@@ -55,6 +54,13 @@ USER ${USER}
 WORKDIR ${HOME}
 
 ### Klipper setup ###
+STAGE: builder_klipper
+FROM builder_base AS builder_klipper
+ARG MOONRAKER_VENV_DIR
+ARG MOONRAKER_BRANCH
+
+ENV PYTHONUNBUFFERED=1
+
 RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klipper3d/klipper.git klipper
 RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
 
@@ -62,12 +68,18 @@ WORKDIR ${HOME}/klipper
 RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
     ${KLIPPER_VENV_DIR}/bin/pip install \
 	--requirement scripts/klippy-requirements.txt
-RUN ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
+RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py && \
+    ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
 COPY klipper/config_linux_mcu ./.config
 RUN make
 
-WORKDIR ${HOME}
+FROM builder_base AS builder_moonraker
+ARG MOONRAKER_VENV_DIR
+ARG MOONRAKER_BRANCH
+
+ENV PYTHONUNBUFFERED=1
+
 # Install moonraker
 RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Arksine/moonraker.git moonraker
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
@@ -187,10 +199,10 @@ CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/
 # prepare image containing moonraker venv
 FROM image as moonraker
 
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/config ${HOME}/klipper/config
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/klipper/docs ${HOME}/klipper/docs
-COPY --chown=${USER}:${USER} --from=builder ${HOME}/moonraker ${HOME}/moonraker
-COPY --chown=${USER}:${USER} --from=builder ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
+COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/config ${HOME}/klipper/config
+COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/docs ${HOME}/klipper/docs
+COPY --chown=${USER}:${USER} --from=builder_moonraker ${HOME}/moonraker ${HOME}/moonraker
+COPY --chown=${USER}:${USER} --from=builder_moonraker ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
 
 ENV MOONRAKER_VENV_DIR=${MOONRAKER_VENV_DIR}
 
