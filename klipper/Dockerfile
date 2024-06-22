@@ -6,7 +6,7 @@ ARG KLIPPER_VENV_DIR=${HOME}/klippy-env
 ARG MOONRAKER_VENV_DIR=${HOME}/moonraker-env
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PYTHON_VERSION=3.11
-ARG DEBIAN_VERSION=bullseye
+ARG DEBIAN_VERSION=bookworm
 
 # STAGE: builder
 # inermediate builder phase (not exported)
@@ -112,12 +112,11 @@ RUN apt-get update && \
     iproute2 \
     libcurl4-openssl-dev \
     libjpeg-dev \
-    libtiff6 \
     liblmdb-dev \
     libopenjp2-7 \
     libsodium-dev \
     libssl-dev \
-    libtiff5 \
+    libtiff6 \
     locales \
     rsync \
     zlib1g-dev && \
