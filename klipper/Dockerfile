@@ -123,6 +123,7 @@ RUN apt-get update && \
     libssl-dev \
     libtiff6 \
     libgeos-c1v5 \
+    libopenblas0 \
     locales \
     rsync \
     zlib1g-dev && \
