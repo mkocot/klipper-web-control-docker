@@ -112,6 +112,7 @@ RUN apt-get update && \
     iproute2 \
     libcurl4-openssl-dev \
     libjpeg-dev \
+    libtiff6 \
     liblmdb-dev \
     libopenjp2-7 \
     libsodium-dev \
