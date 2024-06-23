@@ -75,30 +75,6 @@ RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py && \
 COPY klipper/config_linux_mcu ./.config
 RUN make
 
-# STAGE: builder_moonraker
-# image with build dependencies for moonraker (not exported)
-FROM builder_base AS builder_moonraker
-ARG MOONRAKER_VENV_DIR
-ARG MOONRAKER_BRANCH
-
-ENV PYTHONUNBUFFERED=1
-
-# Install moonraker
-RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Arksine/moonraker.git moonraker
-RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
-
-WORKDIR ${HOME}/moonraker
-# NOTE: There is numpy 2.x out there and today (22.06.2024)
-# there is no wheel on https://www.piwheels.org/simple/numpy/
-# for python 3.11. Force installing numpy < 2 to prevent compiling it for hours
-# THIS IS TEMPORAL SOLUTION
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install \
-	--requirement scripts/moonraker-requirements.txt && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install 'numpy<2' shapely
-RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
-
-
 # STAGE: image
 # image with dependencies for klipper and moonraker (not exported)
 FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS image
@@ -202,12 +178,30 @@ CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/
 # prepare image containing moonraker venv
 FROM image AS moonraker
 
+ARG MOONRAKER_VENV_DIR
+ARG MOONRAKER_BRANCH
+ARG HOME
+
+ENV PYTHONUNBUFFERED=1
+
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/config ${HOME}/klipper/config
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/docs ${HOME}/klipper/docs
-COPY --chown=${USER}:${USER} --from=builder_moonraker ${HOME}/moonraker ${HOME}/moonraker
-COPY --chown=${USER}:${USER} --from=builder_moonraker ${MOONRAKER_VENV_DIR} ${MOONRAKER_VENV_DIR}
 
-ENV MOONRAKER_VENV_DIR=${MOONRAKER_VENV_DIR}
+# Install moonraker
+RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Arksine/moonraker.git moonraker
+RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
+
+WORKDIR ${HOME}/moonraker
+# NOTE: There is numpy 2.x out there and today (22.06.2024)
+# there is no wheel on https://www.piwheels.org/simple/numpy/
+# for python 3.11. Force installing numpy < 2 to prevent compiling it for hours
+# THIS IS TEMPORAL SOLUTION
+RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install \
+	--requirement scripts/moonraker-requirements.txt && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install 'numpy<2' shapely
+
+RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
 
