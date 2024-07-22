@@ -27,7 +27,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1
       matrix:
         # all images share common file, use serial execution to reuse cache
         image_variant: ["klipper", "klipper_full", "klipper_mcu", "moonraker"]
