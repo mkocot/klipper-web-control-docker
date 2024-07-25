@@ -114,7 +114,6 @@ RUN apt-get update && \
     libssl-dev \
     libtiff6 \
     libgeos-c1v5 \
-    libgeos-dev \
     libopenblas0 \
     locales \
     rsync \
@@ -196,7 +195,7 @@ WORKDIR ${HOME}/moonraker
 RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
     ${MOONRAKER_VENV_DIR}/bin/pip install \
 	--requirement scripts/moonraker-requirements.txt && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install numpy shapely
+    ${MOONRAKER_VENV_DIR}/bin/pip install --prefer-binary numpy shapely
 
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
