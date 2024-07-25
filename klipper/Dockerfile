@@ -114,6 +114,7 @@ RUN apt-get update && \
     libssl-dev \
     libtiff6 \
     libgeos-c1v5 \
+    libgeos-dev \
     libopenblas0 \
     locales \
     rsync \
