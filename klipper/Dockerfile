@@ -199,7 +199,7 @@ RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
 
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
-CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
+CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
 
 # STAGE: klipper_full
 # extended image with matplotlib and numpy for resonance calibration
