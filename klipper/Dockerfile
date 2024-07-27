@@ -192,14 +192,10 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-# NOTE: There is numpy 2.x out there and today (22.06.2024)
-# there is no wheel on https://www.piwheels.org/simple/numpy/
-# for python 3.11. Force installing numpy < 2 to prevent compiling it for hours
-# THIS IS TEMPORAL SOLUTION
 RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
     ${MOONRAKER_VENV_DIR}/bin/pip install \
 	--requirement scripts/moonraker-requirements.txt && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install 'numpy<2' shapely
+    ${MOONRAKER_VENV_DIR}/bin/pip install --prefer-binary numpy shapely
 
 RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
