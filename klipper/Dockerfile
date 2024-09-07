@@ -207,4 +207,4 @@ FROM klipper AS klipper_full
 
 RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
     ${KLIPPER_VENV_DIR}/bin/python -m pip install \
-        --no-cache-dir 'numpy<2' matplotlib
+        --no-cache-dir numpy matplotlib
