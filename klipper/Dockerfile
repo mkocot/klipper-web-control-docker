@@ -1,5 +1,4 @@
 # common shared params
-ARG WHEELS=/wheels
 ARG USER=klippy
 ARG HOME=/home/${USER}
 ARG KLIPPER_BRANCH="master"
@@ -12,15 +11,20 @@ ARG DEBIAN_VERSION=bookworm
 
 # STAGE: builder_base
 # inermediate builder phase (not exported)
-FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS builder_base
+FROM docker.io/python:${PYTHON_VERSION}-${DEBIAN_VERSION} AS builder_base
 
 ARG DEBIAN_FRONTEND
 ARG USER
 ARG HOME
 ARG KLIPPER_VENV_DIR
 ARG KLIPPER_BRANCH
+ARG MOONRAKER_VENV_DIR
 
-ENV PYTHONUNBUFFERED=1
+# export ARGS as ENVS
+ENV HOME ${HOME}
+ENV USER ${USER}
+ENV KLIPPER_VENV_DIR ${KLIPPER_VENV_DIR}
+ENV MOONRAKER_VENV_DIR ${MOONRAKER_VENV_DIR}
 
 RUN useradd -d ${HOME} -ms /bin/bash ${USER}
 RUN apt-get update && \
@@ -39,16 +43,18 @@ RUN apt-get update && \
 	libopenjp2-7 \
 	liblmdb-dev \
 	libsodium-dev \
-	cmake
-
-RUN sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
+	cmake && \
+    sed -i -e 's/# (en_GB.UTF-8 UTF-8)/$1/' /etc/locale.gen && locale-gen
 
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
 
+# Python & PIP configuration
+ENV PYTHONUNBUFFERED=1
+ENV PIP_ONLY_BINARY=:all:
 # Configure armv7 repository
-RUN printf "[global]\nextra-index-url=https://www.piwheels.org/simple\n" >> /etc/pip.conf
+ENV PIP_EXTRA_INDEX_URL=https://www.piwheels.org/simple
 
 USER ${USER}
 WORKDIR ${HOME}
@@ -57,18 +63,16 @@ WORKDIR ${HOME}
 # STAGE: builder_klipper
 # image with build dependencies for klipper (not exported)
 FROM builder_base AS builder_klipper
-ARG MOONRAKER_VENV_DIR
-ARG MOONRAKER_BRANCH
+ARG KLIPPER_BRANCH
 
-ENV PYTHONUNBUFFERED=1
-
-RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klipper3d/klipper.git klipper
-RUN [ ! -d ${KLIPPER_VENV_DIR} ] && python3 -m venv ${KLIPPER_VENV_DIR}
+RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klipper3d/klipper.git
 
 WORKDIR ${HOME}/klipper
-RUN ${KLIPPER_VENV_DIR}/bin/pip install wheel && \
-    ${KLIPPER_VENV_DIR}/bin/pip install \
-	--requirement scripts/klippy-requirements.txt
+
+RUN python3 -m venv ${KLIPPER_VENV_DIR} && \
+    ${KLIPPER_VENV_DIR}/bin/pip install --upgrade pip wheel \
+    --requirement scripts/klippy-requirements.txt
+
 RUN ${KLIPPER_VENV_DIR}/bin/python klippy/chelper/__init__.py && \
     ${KLIPPER_VENV_DIR}/bin/python -m compileall klippy
 
@@ -77,26 +81,31 @@ RUN make
 
 # STAGE: image
 # image with dependencies for klipper and moonraker (not exported)
-FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS image
+FROM docker.io/python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS image
 
 # Use default values
 ARG DEBIAN_FRONTEND
 ARG HOME
+ARG USER
 ARG KLIPPER_VENV_DIR
 ARG MOONRAKER_VENV_DIR
-ARG USER
 
 # export ARGS as ENVS
 ENV HOME ${HOME}
+ENV USER ${USER}
 ENV KLIPPER_VENV_DIR ${KLIPPER_VENV_DIR}
 ENV MOONRAKER_VENV_DIR ${MOONRAKER_VENV_DIR}
-ENV USER ${USER}
 
 # customize
 ENV DATA_DIR=${HOME}/printer_data
 ENV CONFIG_DIR=${DATA_DIR}/config
 
+# Python & PIP configuration
 ENV PYTHONUNBUFFERED=1
+ENV PIP_ONLY_BINARY=:all:
+ENV PIP_NO_CACHE_DIR=1
+# Configure armv7 repository
+ENV PIP_EXTRA_INDEX_URL=https://www.piwheels.org/simple
 
 ARG DEVICE_GROUP=device
 ARG DEVICE_GID=987
@@ -128,9 +137,6 @@ RUN apt-get update && \
 ENV LC_ALL en_GB.UTF-8 
 ENV LANG en_GB.UTF-8  
 ENV LANGUAGE en_GB:en   
-
-# Configure armv7 repository
-RUN printf "[global]\nextra-index-url=https://www.piwheels.org/simple\n" >> /etc/pip.conf
 
 RUN useradd --user-group --no-log-init --shell /bin/false -m -d ${HOME} ${USER} && \
     groupadd -g ${DEVICE_GID} ${DEVICE_GROUP} && \
@@ -178,26 +184,20 @@ CMD ["/usr/local/bin/klipper_mcu", "-r", "-I", "/home/klippy/printer_data/comms/
 # prepare image containing moonraker venv
 FROM image AS moonraker
 
-ARG MOONRAKER_VENV_DIR
 ARG MOONRAKER_BRANCH
-ARG HOME
-
-ENV PYTHONUNBUFFERED=1
 
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/config ${HOME}/klipper/config
 COPY --chown=${USER}:${USER} --from=builder_klipper ${HOME}/klipper/docs ${HOME}/klipper/docs
 
 # Install moonraker
 RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Arksine/moonraker.git moonraker
-RUN [ ! -d ${MOONRAKER_VENV_DIR} ] && python3 -m venv ${MOONRAKER_VENV_DIR}
 
 WORKDIR ${HOME}/moonraker
-RUN ${MOONRAKER_VENV_DIR}/bin/pip install wheel && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install \
-	--requirement scripts/moonraker-requirements.txt && \
-    ${MOONRAKER_VENV_DIR}/bin/pip install --prefer-binary numpy shapely
 
-RUN ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
+RUN python3 -m venv ${MOONRAKER_VENV_DIR} && \
+    ${MOONRAKER_VENV_DIR}/bin/pip install --upgrade pip wheel numpy shapely \
+    	--requirement scripts/moonraker-requirements.txt && \
+    ${MOONRAKER_VENV_DIR}/bin/python -m compileall moonraker
 
 CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker.py -u ${DATA_DIR}/comms/moonraker.sock
 
@@ -205,6 +205,5 @@ CMD ${MOONRAKER_VENV_DIR}/bin/python moonraker/moonraker.py -u ${DATA_DIR}/comms
 # extended image with matplotlib and numpy for resonance calibration
 FROM klipper AS klipper_full
 
-RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade pip && \
-    ${KLIPPER_VENV_DIR}/bin/python -m pip install \
-        --no-cache-dir numpy matplotlib
+RUN ${KLIPPER_VENV_DIR}/bin/python -m pip install --upgrade \
+    pip numpy matplotlib
