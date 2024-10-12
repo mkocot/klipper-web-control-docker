@@ -1,5 +1,3 @@
-version: '3.4'
-
 services:
   klipper:
     image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper
@@ -19,12 +17,14 @@ services:
     volumes:
       - moonraker_data:/home/klippy/printer_data
       - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
-      - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
+      - gcode_files:/home/klippy/printer_data/gcodes
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/printer_data/config
       # /dev is required for (dynamic) sharing printer and host serial
       - /dev:/dev
+      # My own experimental plugin
+      - ./gcode_pid.py:/home/klippy/klipper/klippy/extras/gcode_pid.py
     # mount serial device - take care to grant sufficient permissions to the device: <host_dev>:<container_dev>
     # put <container_dev> into your printer.cfg
     #devices:
@@ -37,10 +37,8 @@ services:
     cap_add:
       - sys_nice
     restart: unless-stopped
-    volumes:
-      - moonraker_data:/home/klippy/printer_data
-      # /dev is required for sharing host serial
-      - /dev:/dev
+    volumes_from:
+      - klipper
     depends_on: 
       - klipper
   moonraker:
@@ -50,15 +48,11 @@ services:
     ports:
       - 7125:7125
     restart: unless-stopped
+    volumes_from:
+      - klipper
     volumes:
-      - moonraker_data:/home/klippy/printer_data
-      - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
-      - gcode_files_tmpfs:/home/klippy/printer_data/gcodes
       # bind secrets file to printer_data on docker
       - ./config/moonraker.secrets:/home/klippy/printer_data/moonraker.secrets
-      # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
-      # that way you can merge upstream changes to your customized configs
-      - ./config:/home/klippy/printer_data/config
     environment:
         # Disable saving logs from moonraker
         - 'MOONRAKER_DISABLE_FILE_LOG=True'
@@ -76,6 +70,17 @@ services:
     depends_on: 
       - moonraker
 
+  notifier:
+    container_name: notifier
+    restart: unless-stopped
+    image: klipper-web-control-docker_notifier
+    #build:
+    #  dockerfile: extras/Dockerfile.matrix-webhook
+    #  context: .
+    #ports:
+    #  - 4785:4785
+    command: -u ${MATRIX_WEBHOOK_SERVER} -i ${MATRIX_WEBHOOK_USER} -p ${MATRIX_WEBHOOK_PASSWORD} -k ${MATRIX_WEBHOOK_API_KEY}
+
 volumes: 
   gcode_files:
   gcode_files_tmpfs:
@@ -88,4 +93,4 @@ volumes:
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: size=50m
+      o: size=100m
