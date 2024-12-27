@@ -35,7 +35,7 @@ jobs:
               BRANCH=${GITHUB_REF#refs/heads/}
           fi
 
-          echo "Fetching list of cache key on $BRANCH_NAME"
+          echo "Fetching list of cache key on $BRANCH"
 
           cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
 
