@@ -69,6 +69,8 @@ RUN git clone --single-branch --branch ${KLIPPER_BRANCH} https://github.com/Klip
 
 WORKDIR ${HOME}/klipper
 
+RUN echo -n "Klipper version: " && git describe --tags
+
 RUN python3 -m venv ${KLIPPER_VENV_DIR} && \
     ${KLIPPER_VENV_DIR}/bin/pip install --upgrade pip wheel \
     --requirement scripts/klippy-requirements.txt
@@ -194,7 +196,7 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 
 WORKDIR ${HOME}/moonraker
 
-RUN echo "Cloned version:" && git describe --tags
+RUN echo -n "Moonraker version: " && git describe --tags
 
 RUN python3 -m venv ${MOONRAKER_VENV_DIR} && \
     ${MOONRAKER_VENV_DIR}/bin/pip install --upgrade pip wheel numpy shapely \
