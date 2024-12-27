@@ -24,36 +24,6 @@ env:
 
 
 jobs:
-  cleanup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cleanup
-        run: |
-          if [ -n "$GITHUB_HEAD_REF" ]; then
-              BRANCH=$GITHUB_HEAD_REF
-          else
-              BRANCH=${GITHUB_REF#refs/heads/}
-          fi
-
-          echo "Fetching list of cache key on $BRANCH"
-
-          cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
-
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-              gh cache delete $cacheKey
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          GITHUB_REF: ${{ github.ref }}
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-
-
   build:
     runs-on: ubuntu-latest
     strategy:
