@@ -194,6 +194,8 @@ RUN git clone --single-branch --branch ${MOONRAKER_BRANCH} https://github.com/Ar
 
 WORKDIR ${HOME}/moonraker
 
+RUN echo "Cloned version:" && git describe --tags
+
 RUN python3 -m venv ${MOONRAKER_VENV_DIR} && \
     ${MOONRAKER_VENV_DIR}/bin/pip install --upgrade pip wheel numpy shapely \
     	--requirement scripts/moonraker-requirements.txt && \
