@@ -1,0 +1,16 @@
+name: Clear all GitHub actions caches
+on:
+  schedule:
+    - cron: "0 2 * * 0"  # run automatically each Sunday 2:00 UTC
+  workflow_dispatch:     # allow to run manually
+
+jobs:
+  clear-github-caches:
+    name: Clear all GitHub action caches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear all caches
+        run: gh cache delete --all --repo mkocot/klipper-web-control-docker
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTION_CLEAR_CACHES_TOKEN }}
+
