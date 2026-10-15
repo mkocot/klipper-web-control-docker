@@ -1,0 +1,8 @@
+FROM ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper_full
+RUN mkdir -p $HOME/plugins $HOME/printer_data.upper $HOME/printer_data.wd
+
+# design main image as
+# /docker-entrypoint.sh
+# /docker-entrypoint.d/
+#  50-start.sh
+# to allow custom scripts to be executed before and after
