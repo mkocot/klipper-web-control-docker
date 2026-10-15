@@ -1,6 +1,9 @@
 services:
   klipper:
-    image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper
+    build:
+      context: .
+      dockerfile: ./klipper/Dockerfile.pre
+    #image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper
     #build:
     #  dockerfile: ./klipper/Dockerfile
     #  context: .
@@ -14,6 +17,7 @@ services:
     container_name: klipper
     privileged: true
     restart: unless-stopped
+    network_mode: host
     volumes:
       - moonraker_data:/home/klippy/printer_data
       - moonraker_logs_tmpfs:/home/klippy/printer_data/logs
@@ -21,6 +25,7 @@ services:
       # be aware to create your own branch if you mount the config folder as it will be updated on the main branch
       # that way you can merge upstream changes to your customized configs
       - ./config:/home/klippy/printer_data/config
+      - plugins:/home/klippy/plugins
       # /dev is required for (dynamic) sharing printer and host serial
       - /dev:/dev
       # My own experimental plugin
@@ -29,6 +34,7 @@ services:
     # put <container_dev> into your printer.cfg
     #devices:
     #  - /dev/ttyUSB0:/dev/ttyUSB0
+
   klipper_mcu:
     image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper_mcu
     #user: root
@@ -41,6 +47,21 @@ services:
       - klipper
     depends_on: 
       - klipper
+
+  klipper_post:
+    # image is not so important, just reuse one
+    image: ghcr.io/mkocot/klipper-web-control-docker:ender3-klipper_full
+    container_name: klipper_post
+    restart: no
+    volumes_from:
+      - klipper
+    depends_on:
+      - klipper_mcu
+    volumes:
+      - ./klipper:/home/klippy/scripts
+    entrypoint: ["/bin/bash"]
+    command: ["/home/klippy/scripts/post-klipper.sh"]
+
   moonraker:
     image: ghcr.io/mkocot/klipper-web-control-docker:ender3-moonraker
     container_name: moonraker
@@ -57,9 +78,7 @@ services:
         # Disable saving logs from moonraker
         - 'MOONRAKER_DISABLE_FILE_LOG=True'
     depends_on: 
-      - klipper
-      - klipper_mcu
-
+      - klipper_post
 
   fluidd:
     image: ghcr.io/fluidd-core/fluidd:latest
@@ -73,15 +92,16 @@ services:
   notifier:
     container_name: notifier
     restart: unless-stopped
-    image: klipper-web-control-docker_notifier
-    #build:
-    #  dockerfile: extras/Dockerfile.matrix-webhook
-    #  context: .
+    #image: klipper-web-control-docker_notifier
+    build:
+      dockerfile: extras/Dockerfile.matrix-webhook
+      context: .
     #ports:
     #  - 4785:4785
     command: -u ${MATRIX_WEBHOOK_SERVER} -i ${MATRIX_WEBHOOK_USER} -p ${MATRIX_WEBHOOK_PASSWORD} -k ${MATRIX_WEBHOOK_API_KEY}
 
 volumes: 
+  plugins:
   gcode_files:
   gcode_files_tmpfs:
     driver_opts:
